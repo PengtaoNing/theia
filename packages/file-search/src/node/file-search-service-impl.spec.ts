@@ -25,6 +25,10 @@ import { bindLogger } from '@theia/core/lib/node/logger-backend-module';
 import processBackendModule from '@theia/process/lib/node/process-backend-module';
 import URI from '@theia/core/lib/common/uri';
 import { FileSearchService } from '../common/file-search-service';
+import { DefaultUriLabelProviderContribution } from '@theia/core/lib/browser/label-provider';
+import { EnvVariablesServer } from '@theia/core/lib/common/env-variables';
+import { MockEnvVariablesServerImpl } from '@theia/core/lib/browser/test/mock-env-variables-server';
+import * as temp from 'temp';
 
 /* eslint-disable no-unused-expressions */
 
@@ -35,6 +39,9 @@ testContainer.load(processBackendModule);
 testContainer.load(new ContainerModule(bind => {
     bind(FileSearchServiceImpl).toSelf().inSingletonScope();
 }));
+testContainer.bind(EnvVariablesServer).toConstantValue(new MockEnvVariablesServerImpl(FileUri.create(temp.track().mkdirSync())));
+testContainer.bind(DefaultUriLabelProviderContribution).toSelf().inSingletonScope();
+const labelProvider = testContainer.get(DefaultUriLabelProviderContribution);
 
 describe('search-service', function (): void {
 
@@ -49,7 +56,7 @@ describe('search-service', function (): void {
     it('shall fuzzy search this spec file', async () => {
         const rootUri = FileUri.create(path.resolve(__dirname, '..')).toString();
         const matches = await service.find('spc', { rootUris: [rootUri] });
-        const expectedFile = FileUri.create(__filename).displayName;
+        const expectedFile = labelProvider.getLongName(FileUri.create(__filename))!;
         const testFile = matches.find(e => e.endsWith(expectedFile));
         expect(testFile).to.be.not.undefined;
     });
@@ -165,9 +172,9 @@ describe('search-service', function (): void {
             const matches = await service.find(searchPattern, { rootUris: [rootUri.toString()], fuzzyMatch: false, useGitIgnore: true, limit: 200 });
             for (const match of matches) {
                 const relativeUri = rootUri.relative(new URI(match));
-                assert.notEqual(relativeUri, undefined);
+                assert.notDeepStrictEqual(relativeUri, undefined);
                 const relativeMatch = relativeUri!.toString();
-                assert.notEqual(relativeMatch.indexOf(searchPattern), -1, relativeMatch);
+                assert.notDeepStrictEqual(relativeMatch.indexOf(searchPattern), -1, relativeMatch);
             }
         });
 
@@ -175,12 +182,12 @@ describe('search-service', function (): void {
             const matches = await service.find('shell', { rootUris: [rootUri.toString()], fuzzyMatch: true, useGitIgnore: true, limit: 200 });
             for (const match of matches) {
                 const relativeUri = rootUri.relative(new URI(match));
-                assert.notEqual(relativeUri, undefined);
+                assert.notDeepStrictEqual(relativeUri, undefined);
                 const relativeMatch = relativeUri!.toString();
                 let position = 0;
                 for (const ch of 'shell') {
                     position = relativeMatch.indexOf(ch, position);
-                    assert.notEqual(position, -1, relativeMatch);
+                    assert.notDeepStrictEqual(position, -1, relativeMatch);
                 }
             }
         });
